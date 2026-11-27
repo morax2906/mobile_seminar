@@ -9,6 +9,7 @@ import com.seminar.biometric.biometric.BiometricAuthenticator
 import com.seminar.biometric.biometric.BiometricAvailability
 import com.seminar.biometric.biometric.BiometricType
 import com.seminar.biometric.biometric.FaceAuthenticator
+import com.seminar.biometric.biometric.FaceBiometricAuthenticator
 import com.seminar.biometric.biometric.FingerprintAuthenticator
 import com.seminar.biometric.data.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,19 +29,18 @@ data class LoginUiState(
 )
 
 class LoginViewModel(
-    private val authRepository: AuthRepository = AuthRepository.instance
+    private val authRepository: AuthRepository = AuthRepository.instance,
+    private val authenticators: Map<BiometricType, BiometricAuthenticator> = mapOf(
+        BiometricType.FINGERPRINT to FingerprintAuthenticator(),
+        BiometricType.FACE to FaceAuthenticator()
+    )
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    // Bảng đăng ký các authenticator (Dễ dàng mở rộng hoặc thay thế bởi teammate)
-    private val authenticators: Map<BiometricType, BiometricAuthenticator> = mapOf(
-        BiometricType.FINGERPRINT to FingerprintAuthenticator(),
-        BiometricType.FACE to FaceAuthenticator()
-    )
-
     fun onUsernameChange(newVal: String) {
+        (authenticators[BiometricType.FACE] as? FaceBiometricAuthenticator)?.setTargetUsername(newVal)
         _uiState.update { it.copy(usernameInput = newVal, feedbackMessage = null) }
     }
 
@@ -52,6 +52,8 @@ class LoginViewModel(
      * Kiểm tra trạng thái cảm biến sinh trắc học của thiết bị
      */
     fun refreshBiometricStatus(context: Context) {
+        (authenticators[BiometricType.FACE] as? FaceBiometricAuthenticator)
+            ?.setTargetUsername(_uiState.value.usernameInput)
         val fpStatus = authenticators[BiometricType.FINGERPRINT]?.checkAvailability(context)
             ?: BiometricAvailability.NoHardware
         val faceStatus = authenticators[BiometricType.FACE]?.checkAvailability(context)
@@ -108,6 +110,11 @@ class LoginViewModel(
             return
         }
 
+        // Đồng bộ tài khoản mục tiêu nếu là Face Authenticator
+        if (type == BiometricType.FACE && authenticator is FaceBiometricAuthenticator) {
+            authenticator.setTargetUsername(_uiState.value.usernameInput)
+        }
+
         // Kiểm tra phần cứng trước khi gọi prompt
         val availability = authenticator.checkAvailability(activity)
         if (!availability.isAvailable) {
@@ -125,7 +132,12 @@ class LoginViewModel(
             viewModelScope.launch {
                 when (result) {
                     is BiometricAuthResult.Success -> {
-                        authRepository.loginWithBiometric(type, _uiState.value.usernameInput)
+                        authRepository.loginWithBiometric(
+                            type = type,
+                            username = _uiState.value.usernameInput,
+                            matchingScore = result.matchingScore,
+                            threshold = result.threshold
+                        )
                         _uiState.update {
                             it.copy(
                                 feedbackMessage = result.message,
@@ -146,6 +158,74 @@ class LoginViewModel(
                         _uiState.update {
                             it.copy(
                                 feedbackMessage = "Người dùng đã hủy xác thực.",
+                                isErrorMessage = false
+                            )
+                        }
+                    }
+                    is BiometricAuthResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                feedbackMessage = "Lỗi (${result.errorCode}): ${result.errorMessage}",
+                                isErrorMessage = true
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun enrollFace(
+        activity: FragmentActivity,
+        username: String = _uiState.value.usernameInput
+    ) {
+        val trimmedUsername = username.trim()
+        if (trimmedUsername.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    feedbackMessage = "Vui lòng nhập Tên người dùng trước khi đăng ký khuôn mặt.",
+                    isErrorMessage = true
+                )
+            }
+            return
+        }
+
+        val faceAuth = authenticators[BiometricType.FACE] as? FaceBiometricAuthenticator
+        if (faceAuth == null) {
+            _uiState.update {
+                it.copy(
+                    feedbackMessage = "Chức năng đăng ký khuôn mặt chưa sẵn sàng.",
+                    isErrorMessage = true
+                )
+            }
+            return
+        }
+
+        faceAuth.setTargetUsername(trimmedUsername)
+        faceAuth.enroll(activity, trimmedUsername) { result ->
+            viewModelScope.launch {
+                when (result) {
+                    is BiometricAuthResult.Success -> {
+                        refreshBiometricStatus(activity)
+                        _uiState.update {
+                            it.copy(
+                                feedbackMessage = result.message,
+                                isErrorMessage = false
+                            )
+                        }
+                    }
+                    is BiometricAuthResult.Failed -> {
+                        _uiState.update {
+                            it.copy(
+                                feedbackMessage = "Đăng ký khuôn mặt thất bại.",
+                                isErrorMessage = true
+                            )
+                        }
+                    }
+                    is BiometricAuthResult.Cancelled -> {
+                        _uiState.update {
+                            it.copy(
+                                feedbackMessage = "Đã hủy đăng ký khuôn mặt.",
                                 isErrorMessage = false
                             )
                         }

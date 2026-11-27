@@ -30,14 +30,21 @@ class AuthRepository {
     /**
      * Đăng nhập sau khi hoàn thành xác thực sinh trắc học
      */
-    fun loginWithBiometric(type: BiometricType, username: String = "BiometricUser"): UserSession {
+    fun loginWithBiometric(
+        type: BiometricType,
+        username: String = "BiometricUser",
+        matchingScore: Float? = null,
+        threshold: Float? = null
+    ): UserSession {
         val method = when (type) {
             BiometricType.FINGERPRINT -> AuthMethod.FINGERPRINT
             BiometricType.FACE -> AuthMethod.FACE
         }
         val session = UserSession(
             username = username,
-            authMethod = method
+            authMethod = method,
+            matchingScore = matchingScore,
+            threshold = threshold
         )
         _currentUser.value = session
         return session

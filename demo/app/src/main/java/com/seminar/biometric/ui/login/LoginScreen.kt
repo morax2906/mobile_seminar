@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import com.seminar.biometric.biometric.BiometricAvailability
 import com.seminar.biometric.biometric.BiometricType
 import com.seminar.biometric.ui.theme.ErrorRed
 import com.seminar.biometric.ui.theme.PrimaryBlue
@@ -67,7 +69,7 @@ fun LoginScreen(
     val context = LocalContext.current
     val activity = context as? FragmentActivity
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(uiState.usernameInput) {
         viewModel.refreshBiometricStatus(context)
     }
 
@@ -246,7 +248,8 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // NÚT XÁC THỰC KHUÔN MẶT (Slot của Teammate)
+                    // NÚT XÁC THỰC KHUÔN MẶT
+                    val isFaceEnrolled = uiState.faceStatus is BiometricAvailability.Available
                     OutlinedButton(
                         onClick = {
                             activity?.let {
@@ -269,6 +272,42 @@ fun LoginScreen(
                         Text(
                             text = "Xác thực bằng Khuôn mặt",
                             fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = when (uiState.faceStatus) {
+                            is BiometricAvailability.Available ->
+                                "Trạng thái Face (${uiState.usernameInput.ifBlank { "?" }}): Đã đăng ký mẫu"
+                            is BiometricAvailability.NoneEnrolled ->
+                                "Trạng thái Face (${uiState.usernameInput.ifBlank { "?" }}): Chưa có mẫu — hãy đăng ký trước"
+                            else -> "Trạng thái Face: ${uiState.faceStatus.getDisplayMessage()}"
+                        },
+                        fontSize = 12.sp,
+                        color = if (isFaceEnrolled) SuccessGreen else Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            activity?.let { viewModel.enrollFace(it) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PersonAdd,
+                            contentDescription = "Đăng ký khuôn mặt",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isFaceEnrolled) "Cập nhật mẫu Khuôn mặt" else "Đăng ký Khuôn mặt (Enrollment)",
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }

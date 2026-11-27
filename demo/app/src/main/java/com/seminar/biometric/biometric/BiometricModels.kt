@@ -38,7 +38,9 @@ sealed class BiometricAvailability {
 sealed class BiometricAuthResult {
     data class Success(
         val type: BiometricType,
-        val message: String = "Xác thực sinh trắc học thành công"
+        val message: String = "Xác thực sinh trắc học thành công",
+        val matchingScore: Float? = null,
+        val threshold: Float? = null
     ) : BiometricAuthResult()
 
     data class Error(

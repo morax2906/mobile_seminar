@@ -32,6 +32,7 @@ class MainActivity : FragmentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val currentUser by authRepository.currentUser.collectAsState()
+                    val loginUiState by loginViewModel.uiState.collectAsState()
 
                     if (currentUser != null) {
                         HomeScreen(
@@ -39,7 +40,12 @@ class MainActivity : FragmentActivity() {
                             onLogout = {
                                 authRepository.logout()
                                 loginViewModel.clearFeedback()
-                            }
+                            },
+                            onEnrollFace = { activity ->
+                                loginViewModel.enrollFace(activity, currentUser!!.username)
+                            },
+                            feedbackMessage = loginUiState.feedbackMessage,
+                            isErrorMessage = loginUiState.isErrorMessage
                         )
                     } else {
                         LoginScreen(

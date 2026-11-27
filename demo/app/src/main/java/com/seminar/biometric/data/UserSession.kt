@@ -13,7 +13,9 @@ enum class AuthMethod(val displayName: String) {
 data class UserSession(
     val username: String,
     val authMethod: AuthMethod,
-    val loginTimeMillis: Long = System.currentTimeMillis()
+    val loginTimeMillis: Long = System.currentTimeMillis(),
+    val matchingScore: Float? = null,
+    val threshold: Float? = null
 ) {
     val formattedLoginTime: String
         get() {

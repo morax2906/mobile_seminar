@@ -19,10 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,19 +35,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.seminar.biometric.data.AuthMethod
 import com.seminar.biometric.data.UserSession
+import com.seminar.biometric.ui.theme.ErrorRed
 import com.seminar.biometric.ui.theme.PrimaryBlue
 import com.seminar.biometric.ui.theme.SuccessGreen
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
     session: UserSession,
     onLogout: () -> Unit,
+    onEnrollFace: ((FragmentActivity) -> Unit)? = null,
+    feedbackMessage: String? = null,
+    isErrorMessage: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val activity = LocalContext.current as? FragmentActivity
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -122,6 +130,22 @@ fun HomeScreen(
                 InfoRow(label = "Phương thức:", value = session.authMethod.displayName)
                 Spacer(modifier = Modifier.height(10.dp))
                 InfoRow(label = "Thời điểm:", value = session.formattedLoginTime)
+                if (session.authMethod == AuthMethod.FACE && session.matchingScore != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    InfoRow(
+                        label = "Matching Score:",
+                        value = String.format(Locale.US, "%.3f", session.matchingScore)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    InfoRow(
+                        label = "Threshold:",
+                        value = String.format(
+                            Locale.US,
+                            "%.2f",
+                            session.threshold ?: 0.75f
+                        )
+                    )
+                }
             }
         }
 
@@ -154,12 +178,54 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "• Quy trình: Verification (So khớp mẫu vừa quét với Biometric Template trong phần cứng TEE/SE an toàn).\n" +
+                    text = if (session.authMethod == AuthMethod.FACE && session.matchingScore != null) {
+                        val scoreText = String.format(Locale.US, "%.3f", session.matchingScore)
+                        val thresholdText = String.format(Locale.US, "%.2f", session.threshold ?: 0.75f)
+                        "• Quy trình: Verification 1:1 on-device (CameraX + ML Kit Face Detection + MobileFaceNet).\n" +
+                            "• Matching Score thực tế: $scoreText >= Threshold: $thresholdText (Cosine Similarity trên vector L2).\n" +
+                            "• Template: Chỉ lưu vector đặc trưng theo tài khoản trong SharedPreferences, không lưu ảnh gốc."
+                    } else {
+                        "• Quy trình: Verification (So khớp mẫu vừa quét với Biometric Template trong phần cứng TEE/SE an toàn).\n" +
                             "• Matching Score: Đạt ngưỡng Threshold cho phép của Android Biometric Subsystem.\n" +
-                            "• Bảo mật: Template không bị lưu ra ngoài phần cứng bảo mật; ứng dụng chỉ nhận tín hiệu Success/Failed.",
+                            "• Bảo mật: Template không bị lưu ra ngoài phần cứng bảo mật; ứng dụng chỉ nhận tín hiệu Success/Failed."
+                    },
                     fontSize = 13.sp,
                     lineHeight = 20.sp,
                     color = Color.DarkGray
+                )
+            }
+        }
+
+        if (onEnrollFace != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedButton(
+                onClick = { activity?.let { onEnrollFace(it) } },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.Face, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Đăng ký / Cập nhật khuôn mặt", fontSize = 15.sp)
+            }
+        }
+
+        feedbackMessage?.let { msg ->
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isErrorMessage) ErrorRed.copy(alpha = 0.1f)
+                    else SuccessGreen.copy(alpha = 0.1f)
+                )
+            ) {
+                Text(
+                    text = msg,
+                    modifier = Modifier.padding(14.dp),
+                    color = if (isErrorMessage) ErrorRed else SuccessGreen,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
                 )
             }
         }

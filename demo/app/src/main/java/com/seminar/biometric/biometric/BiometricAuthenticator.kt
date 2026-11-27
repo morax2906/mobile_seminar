@@ -33,3 +33,16 @@ interface BiometricAuthenticator {
         onResult: (BiometricAuthResult) -> Unit
     )
 }
+
+/**
+ * Mở rộng cho phương thức sinh trắc học hỗ trợ đăng ký mẫu (Enrollment) theo từng tài khoản trong ứng dụng.
+ */
+interface FaceBiometricAuthenticator : BiometricAuthenticator {
+    fun setTargetUsername(username: String)
+
+    fun enroll(
+        activity: FragmentActivity,
+        username: String,
+        onResult: (BiometricAuthResult) -> Unit
+    )
+}
