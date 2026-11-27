@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Biometric Auth Seminar</string>
+    <string name="login_title">Xác Thực Sinh Trắc Học</string>
+    <string name="login_subtitle">Seminar Mobile - Nhóm Demo</string>
+</resources>
